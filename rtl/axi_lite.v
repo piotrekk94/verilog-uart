@@ -46,10 +46,11 @@ wire rx_busy;
 wire rx_overrun;
 wire rx_frame_err;
 
-reg [15:0] ctl_prescaler;
-reg ctl_rst;
+wire [15:0] ctl_prescaler;
 reg ctl_rxe;
-wire [4:0] ctl_status;
+
+wire [7:0] stat_reg;
+reg [4:0] ctrl_reg;
 
 reg awready_r;
 reg wready_r;
@@ -61,13 +62,12 @@ reg [31:0] rdata_r;
 reg [1:0] write_addr;
 reg [1:0] read_addr;
 
-reg [31:0] ram_r;
 reg [7:0] uart_rdata_r;
 
 reg uart_send;
 reg uart_read;
 
-assign uart_rst = rst | ctl_rst;
+assign uart_rst = rst | ctrl_reg[1] | ctrl_reg[0];
 
 assign bresp = 0;
 assign rresp = 0;
@@ -79,11 +79,16 @@ assign arready = arready_r;
 assign rvalid = rvalid_r;
 assign rdata = rdata_r;
 
-assign ctl_status[0] = tx_busy;
-assign ctl_status[1] = rx_busy;
-assign ctl_status[2] = rx_overrun;
-assign ctl_status[3] = rx_frame_err;
-assign ctl_status[4] = ctl_rxe;
+assign stat_reg[0] = !ctl_rxe; /* rx valid */
+assign stat_reg[1] = !ctl_rxe; /* rx full */
+assign stat_reg[2] = !tx_busy; /* tx empty */
+assign stat_reg[3] = tx_busy; /* tx full */
+assign stat_reg[4] = ctrl_reg[4]; /* irq enabled */
+assign stat_reg[5] = rx_overrun; /* overrun */
+assign stat_reg[6] = rx_frame_err; /* frame error */
+assign stat_reg[7] = 0; /* parity error */
+
+assign ctl_prescaler = 10;
 
 always @ (posedge clk) begin : axi_aw
 	reg enable;
@@ -114,12 +119,9 @@ always @ (posedge clk) begin : axi_w
 		wready_r <= 0;
 		enable <= 1;
 
-		ctl_rst <= 1;
-		ctl_prescaler <= 0;
 		uart_send <= 0;
 		uart_wdata <= 0;
-		ram_r <= 0;
-
+		ctrl_reg <= 0;
 	end else begin
 		uart_send <= 0;
 		if (enable && wvalid) begin
@@ -131,17 +133,17 @@ always @ (posedge clk) begin : axi_w
 			wready_r <= 0;
 			case (write_addr)
 				0: begin
-					ctl_rst <= wdata[0];
+
 				end
 				1: begin
-					ctl_prescaler <= wdata[15:0];
-				end
-				2: begin
 					uart_send <= 1;
 					uart_wdata <= wdata[7:0];
 				end
+				2: begin
+					ctrl_reg <= wdata[4:0];
+				end
 				3: begin
-					ram_r <= wdata;
+
 				end
 			endcase
 		end
@@ -207,17 +209,17 @@ always @ (posedge clk) begin : axi_r
 			rvalid_r <= 1;
 			case (read_addr)
 				0: begin
-					rdata_r[4:0] <= ctl_status;
-				end
-				1: begin
-					rdata_r[15:0] <= ctl_prescaler;
-				end
-				2: begin
 					uart_read <= 1;
 					rdata_r[7:0] <= uart_rdata_r;
 				end
+				1: begin
+					rdata_r <= 0;
+				end
+				2: begin
+					rdata_r <= 0;
+				end
 				3: begin
-					rdata_r <= ram_r;
+					rdata_r[7:0] <= stat_reg;
 				end
 			endcase
 		end
