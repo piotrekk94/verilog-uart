@@ -37,7 +37,7 @@ reg [7:0] uart_wdata;
 reg uart_wvalid;
 wire uart_wready;
 
-wire uart_rdata;
+wire [7:0] uart_rdata;
 wire uart_rvalid;
 reg uart_rready;
 
