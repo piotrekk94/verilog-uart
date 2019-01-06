@@ -31,6 +31,9 @@ module axi_lite_uart
 	input wire rready
 );
 
+parameter clk_freq = 100000000;
+parameter baudrate = 115200;
+
 wire uart_rst;
 
 reg [7:0] uart_wdata;
@@ -88,7 +91,7 @@ assign stat_reg[5] = rx_overrun; /* overrun */
 assign stat_reg[6] = rx_frame_err; /* frame error */
 assign stat_reg[7] = 0; /* parity error */
 
-assign ctl_prescaler = 10;
+assign ctl_prescaler = clk_freq / (baudrate * 8);
 
 always @ (posedge clk) begin : axi_aw
 	reg enable;
